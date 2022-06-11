@@ -14,7 +14,7 @@ TensorFlow 1.10.1
 Google Drive: https://drive.google.com/file/d/1Z9rx6aCBvRKB-00R08idV3xBV7QHROAx/view?usp=sharing
 
 # Masked dataset
-[Download](https://drive.google.com/file/d/1598pCEdSmmubxjCuQ8OdxyG6E833Ybtx/view?usp=sharing)
+Masked 300W:[Download](https://drive.google.com/file/d/1598pCEdSmmubxjCuQ8OdxyG6E833Ybtx/view?usp=sharing)
 
 # Test GlomFace
 ```
