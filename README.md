@@ -22,7 +22,7 @@ Masked 300W:[Download](https://drive.google.com/file/d/1598pCEdSmmubxjCuQ8OdxyG6
     source activate environment-name
 
     # Track the train process and evaluate the current checkpoint against the validation set
-    python eval.py --dataset_path="./databases/Masked_300W/ibug/*.jpg" --num_examples=135 --eval_dir=ckpt/eval  --device='/gpu:0' --checkpoint_dir=$PWD/ckpt/GF_model
+    python Glom_eval.py --dataset_path="./databases/Masked_300W/ibug/*.jpg" --num_examples=135 --eval_dir=ckpt/eval  --device='/gpu:0' --checkpoint_dir=$PWD/ckpt/GF_model
     
 ```
 # Visualization
