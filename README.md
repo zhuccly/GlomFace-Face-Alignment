@@ -10,8 +10,8 @@ Menpodetect 0.5.0
 Menpo fit 0.5.0
 TensorFlow 1.10.1
 
-# Pretrained model (Note that we saved the complete network and not just the parameters, so the model file is large. )
-Google Drive:[Download](https://drive.google.com/file/d/1Z9rx6aCBvRKB-00R08idV3xBV7QHROAx/view?usp=sharing)
+# Pretrained model 
+Google Drive:[Download](https://drive.google.com/file/d/1Z9rx6aCBvRKB-00R08idV3xBV7QHROAx/view?usp=sharing)(Note that we saved the complete network and not just the parameters, so the model file is large. )
 
 # Masked dataset
 Masked 300W:[Download](https://drive.google.com/file/d/1598pCEdSmmubxjCuQ8OdxyG6E833Ybtx/view?usp=sharing)
