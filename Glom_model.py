@@ -58,6 +58,11 @@ def normalized_rmse(pred, gt_truth):
     norm = tf.sqrt(tf.reduce_sum(((gt_truth[:, 36, :] - gt_truth[:, 45, :])**2), 1))
 
     return tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(pred - gt_truth), 2)), 1) / (norm * 68)
+def bbs_rmse(pred, gt_truth,bbx):
+
+    norm = tf.sqrt(bbx)
+
+    return tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(pred - gt_truth), 2)), 1) / (norm * 68)
 
 def conv_model(inputs, is_training=True, scope=''):
 

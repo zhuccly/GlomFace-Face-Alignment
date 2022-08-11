@@ -12,6 +12,7 @@ import menpo.image
 import menpo.io as mio
 import numpy as np
 import tensorflow as tf
+import detect
 import utils
 from menpo.transform import Translation, Scale
 from menpo.shape import PointCloud
@@ -93,6 +94,25 @@ def align_reference_shape(reference_shape, bb):
         name='initial_shape')
 
 
+def random_shape(gts, reference_shape, pca_model):
+    """Generates a new shape estimate given the ground truth shape.
+    Args:
+      gts: a numpy array [num_landmarks, 2]
+      reference_shape: a Tensor of dimensions [num_landmarks, 2]
+      pca_model: A PCAModel that generates shapes.
+    Returns:
+      The aligned shape, as a Tensor [num_landmarks, 2].
+    """
+
+    def synthesize(lms):
+        return detect.synthesize_detection(pca_model, menpo.shape.PointCloud(
+            lms).bounding_box()).points.astype(np.float32)
+
+    bb, = tf.py_func(synthesize, [gts], [tf.float32])
+    shape = align_reference_shape(reference_shape, bb)
+    shape.set_shape(reference_shape.get_shape())
+
+    return shape
 
 
 def get_noisy_init_from_bb(reference_shape, bb, noise_percentage=.02):
@@ -118,6 +138,157 @@ def get_noisy_init_from_bb(reference_shape, bb, noise_percentage=.02):
     return align_shape_with_bounding_box(reference_shape, bb).points
 
 
+def load_images(paths, group=None, verbose=True):
+    """Loads and rescales input images to the diagonal of the reference shape.
+    Args:
+      paths: a list of strings containing the data directories.
+      reference_shape: a numpy array [num_landmarks, 2]
+      group: landmark group containing the grounth truth landmarks.
+      verbose: boolean, print debugging info.
+    Returns:
+      images: a list of numpy arrays containing images.
+      shapes: a list of the ground truth landmarks.
+      reference_shape: a numpy array [num_landmarks, 2].
+      shape_gen: PCAModel, a shape generator.
+    """
+    images = []
+    shapes = []
+    bbs = []
+    shape_space = []
+
+    reference_shape = PointCloud(build_reference_shape(paths))
+    ini_shape = reference_shape
+    # print(reference_shape.lms.points.shape)
+    # train_dir = Path(FLAGS.train_dir)
+    # reference_shape = PointCloud(mio.import_pickle(train_dir / 'reference_shape.pkl'))
+    # print(reference_shape.shape)
+
+
+    for path in paths:
+        if verbose:
+            print('Importing data from {}'.format(path))
+
+        for im in mio.import_images(path, verbose=verbose, as_generator=True):
+            group = 'PTS'#group or im.landmarks[group]._group_label
+
+            bb_root = im.path.parent.relative_to(im.path.parent.parent.parent)
+            if 'set' not in str(bb_root):
+                bb_root = im.path.parent.relative_to(im.path.parent.parent)
+            #print(str(Path('bbs2')))
+            #load bounding box
+            im.landmarks['bb'] = mio.import_landmark_file(str(Path(
+                'bbs') / bb_root / (im.path.stem + '.pts')))
+            # crop
+
+            # im = im.crop_to_landmarks_proportion(0.3, group='bb')
+            im,trans = crop_image_bounding_box(im, im.landmarks['bb'], [FLAGS.crop_size, FLAGS.crop_size], base=(FLAGS.image_size/FLAGS.crop_size), order=1)
+            # ini_shape = PointCloud(trans.apply(reference_shape.points.copy()))
+            # im.view()
+            # im.view_landmarks(group='PTS')
+            # print reference_shape.points
+            # im = im.rescale_to_pointcloud(reference_shape, group=group)
+            # im = menpo.image.Image(crop_i.pixels_with_channels_at_back())
+            im = grey_to_rgb(im)
+            images.append(im.pixels.transpose(1, 2, 0))
+            shapes.append(im.landmarks[group].lms)
+            shape_space.append(im.landmarks[group].lms.points)
+            bbs.append(im.landmarks['bb'].lms)
+
+    train_dir = Path(FLAGS.train_dir)
+    shape_space = np.array(shape_space)
+    mio.export_pickle(reference_shape.points, train_dir / 'reference_shape.pkl', overwrite=True)
+    print('created reference_shape.pkl using the {} group'.format(group))
+
+    pca_model = detect.create_generator(shapes, bbs)
+
+    # Pad images to max length
+    kmeans = utils.k_means(shape_space, 60)
+    centers = kmeans.cluster_centers_
+    labels = kmeans.predict(shape_space.reshape(-1, 68*2))
+
+    return images, shapes, ini_shape.points, pca_model, centers, labels
+
+def load_cofw29(paths, group=None, verbose=True):
+    """Loads and rescales input images to the diagonal of the reference shape.
+    Args:
+      paths: a list of strings containing the data directories.
+      reference_shape: a numpy array [num_landmarks, 2]
+      group: landmark group containing the grounth truth landmarks.
+      verbose: boolean, print debugging info.
+    Returns:
+      images: a list of numpy arrays containing images.
+      shapes: a list of the ground truth landmarks.
+      reference_shape: a numpy array [num_landmarks, 2].
+      shape_gen: PCAModel, a shape generator.
+    """
+    images = []
+    shapes = []
+    bbs = []
+
+    reference_shape = PointCloud(cofw_reference_shape(paths))
+    ini_shape = reference_shape
+    # print(reference_shape.lms.points.shape)
+    # train_dir = Path(FLAGS.train_dir)
+    # reference_shape = PointCloud(mio.import_pickle(train_dir / 'reference_shape.pkl'))
+    # print(reference_shape.shape)
+
+
+    for path in paths:
+        if verbose:
+            print('Importing data from {}'.format(path))
+
+        for im in mio.import_images(path, verbose=verbose, as_generator=True):
+            group = 'PTS'#group or im.landmarks[group]._group_label
+
+            bb_root = im.path.parent.relative_to(im.path.parent.parent.parent)
+            if 'set' not in str(bb_root):
+                bb_root = im.path.parent.relative_to(im.path.parent.parent)
+            #print(str(Path('bbs2')))
+            #load bounding box
+            im.landmarks['bb'] = mio.import_landmark_file(str(Path(
+                'bbs') / bb_root / (im.path.stem + '.pts')))
+            # crop
+
+            # im = im.crop_to_landmarks_proportion(0.3, group='bb')
+            im,trans = crop_image_bounding_box(im, im.landmarks['bb'], [FLAGS.image_size, FLAGS.image_size], base=198./FLAGS.image_size, order=1)
+            ini_shape = PointCloud(trans.apply(reference_shape.points.copy()))
+            # im.view()
+            # im.view_landmarks(group='PTS')
+            # print reference_shape.points
+            # im = im.rescale_to_pointcloud(reference_shape, group=group)
+            # im = menpo.image.Image(crop_i.pixels_with_channels_at_back())
+            im = grey_to_rgb(im)
+            images.append(im.pixels.transpose(1, 2, 0))
+            shapes.append(im.landmarks[group].lms)
+            bbs.append(im.landmarks['bb'].lms)
+
+    train_dir = Path(FLAGS.train_dir)
+    mio.export_pickle(reference_shape.points, train_dir / 'reference_shape.pkl', overwrite=True)
+    print('created reference_shape.pkl using the {} group'.format(group))
+
+    pca_model = detect.create_generator(shapes, bbs)
+
+    # Pad images to max length
+    max_shape = np.max([im.shape for im in images], axis=0)
+    max_shape = [len(images)] + list(max_shape)
+    padded_images = np.random.rand(*max_shape).astype(np.float32)
+    print(padded_images.shape)
+
+    for i, im in enumerate(images):
+        print ("======================================================================")
+        print (im.shape)
+        height, width = im.shape[:2]
+        dy = max(int((max_shape[1] - height - 1) / 2), 0)
+        dx = max(int((max_shape[2] - width - 1) / 2), 0)
+        lms = shapes[i]
+        pts = lms.points
+        pts[:, 0] += dy
+        pts[:, 1] += dx
+
+        lms = lms.from_vector(pts)
+        padded_images[i, dy:(height+dy), dx:(width+dx)] = im
+
+    return padded_images, shapes, ini_shape.lms, pca_model
 
 def load_data(paths, reference_shape, verbose=True):
     """Loads and rescales input images to the diagonal of the reference shape.
@@ -209,23 +380,26 @@ def load_image(path, reference_shape, is_training=False, group='PTS',
     im = mio.import_image(path)
 
     bb_root = im.path.parent.relative_to(im.path.parent.parent.parent)
-    # if 'set' not in str(bb_root):
-    #     bb_root = im.path.parent.relative_to(im.path.parent.parent)
+    if 'set' not in str(bb_root):
+        bb_root = im.path.parent.relative_to(im.path.parent.parent)
 
     im.landmarks['bb'] = mio.import_landmark_file(str(Path('bbs') / bb_root / (im.path.stem.replace(' ', '') + '.pts')))
+
     im, trans = crop_image_bounding_box(im, im.landmarks['bb'], [256, 256], base=1, order=1)
 
     reference_shape = PointCloud(reference_shape)
-    bb = im.landmarks[group].lms.copy().bounding_box()
+    bb = im.landmarks['bb']
+   # print bb.lms.points
+
+    #bb = im.landmarks[group].lms.copy().bounding_box()
+  #  bb = im.landmarks['bb']
 
 
     _,iamge_hight,image_width = im.pixels.shape
-    bbs = np.array(iamge_hight*iamge_hight)
+    
+    bbx = abs(bb.lms.points[1,0]-bb.lms.points[0,0])*abs(bb.lms.points[0,1]-bb.lms.points[3,1])
+    bbs = np.array(iamge_hight*image_width)
 
-
-    # bbs = abs(bb.lms.points[1,0]-bb.lms.points[0,0])*abs(bb.lms.points[0,1]-bb.lms.points[3,1])
-    # print bb.lms.points
-    # print bb.lms.points[1,0]
     im.landmarks['__initial'] = align_shape_with_bounding_box(reference_shape,
                                                               bb)
     if mirror_image:
@@ -241,7 +415,8 @@ def load_image(path, reference_shape, is_training=False, group='PTS',
     gt_truth = lms.points.astype(np.float32)
     bbs = bbs.astype(np.float32)
     estimate = initial.points.astype(np.float32)
-    return pixels.astype(np.float32).copy(), gt_truth, estimate, bbs
+    bbx = bbx.astype(np.float32)
+    return pixels.astype(np.float32).copy(), gt_truth, estimate, bbs,bbx
 
 def load_cofw68(path, reference_shape, is_training=False, group='PTS',
                mirror_image=False):
@@ -379,11 +554,11 @@ def batch_inputs(paths,
 
     filename = filename_queue.dequeue()
     print (filename)
-    image, lms, lms_init, bbs = tf.py_func(
+    image, lms, lms_init, bbs,bbx = tf.py_func(
         partial(load_image, is_training=is_training,
                 mirror_image=mirror_image),
         [filename, reference_shape], # input arguments
-        [tf.float32, tf.float32, tf.float32, tf.float32], # output types
+        [tf.float32, tf.float32, tf.float32, tf.float32,tf.float32], # output types
         name='load_image'
     )
 
@@ -405,6 +580,7 @@ def batch_inputs(paths,
     lms = tf.reshape(lms, [num_landmarks, 2])
     lms_init = tf.reshape(lms_init, [num_landmarks, 2])
     bbs = tf.reshape(bbs, [1])
+    bbx = tf.reshape(bbx, [1])
 
     # target_h = tf.to_int32(FLAGS.image_size)
     # target_w = tf.to_int32(FLAGS.image_size)
@@ -426,15 +602,15 @@ def batch_inputs(paths,
     # lms_init = lms_init - tf.to_float(tf.stack([offset_h, offset_w]))
 
 
-    images, lms, inits, shapes,bbs = tf.train.batch(
-        [image, lms, lms_init, tf.shape(image), bbs],
+    images, lms, inits, shapes,bbs,bbx = tf.train.batch(
+        [image, lms, lms_init, tf.shape(image), bbs,bbx],
         batch_size=batch_size,
         num_threads=1 if is_training else 1,
         capacity=5000,
         enqueue_many=False,
         dynamic_pad=True)
 
-    return images, lms, inits, shapes,bbs
+    return images, lms, inits, shapes,bbs,bbx
 
 def cofw68_inputs(paths,
                  reference_shape,
