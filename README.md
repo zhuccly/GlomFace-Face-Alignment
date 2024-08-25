@@ -16,12 +16,19 @@ Google Drive:[Download](https://drive.google.com/file/d/1Z9rx6aCBvRKB-00R08idV3x
 # Masked dataset
 Masked 300W:[Download](https://drive.google.com/file/d/1598pCEdSmmubxjCuQ8OdxyG6E833Ybtx/view?usp=sharing)
 
+# Train GlomFace
+```
+
+    # Track the train process
+    python GlomFace_train.py 
+```
+
 # Test GlomFace
 ```
     # Activate the conda environment.
     source activate environment-name
 
-    # Track the train process and evaluate the current checkpoint against the validation set
+    # Evaluate the current checkpoint against the validation set
     python Glom_eval.py --dataset_path="./databases/Masked_300W/ibug/*.jpg" --num_examples=135 --eval_dir=ckpt/eval  --device='/gpu:0' --checkpoint_dir=$PWD/ckpt/GF_model
     
 ```
