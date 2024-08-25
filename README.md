@@ -5,9 +5,13 @@ A Tensorflow implementation of the proposed GlomFace
 # Installation Instructions
 
 Menpo project
+
 Menpo 0.8.1
+
 Menpodetect 0.5.0
+
 Menpo fit 0.5.0
+
 TensorFlow 1.10.1
 
 # Pretrained model 
