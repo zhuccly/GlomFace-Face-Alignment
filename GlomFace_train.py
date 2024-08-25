@@ -27,7 +27,7 @@ tf.app.flags.DEFINE_float('num_epochs_per_decay', 5.0,
                           """Epochs after which learning rate decays.""")
 tf.app.flags.DEFINE_float('learning_rate_decay_factor', 0.95,
                           """Learning rate decay factor.""")
-tf.app.flags.DEFINE_integer('batch_size', 100, """The batch size to use.""")
+tf.app.flags.DEFINE_integer('batch_size', 128, """The batch size to use.""")
 tf.app.flags.DEFINE_integer('num_preprocess_threads', 4,
                             """How many preprocess threads to use.""")
 tf.app.flags.DEFINE_string('train_dir', 'ckpt/train',
